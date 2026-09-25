@@ -1,0 +1,54 @@
+{
+  "titulo": "Criterios que se puedan ver",
+  "modo": "predict",
+  "etiqueta": "vagos contra observables",
+  "resumen": "Se hace la misma pregunta dos veces: la primera define cuando Julia aún no comprendía como actuaba y la segunda usando los criterios que observó. Fíjate en la seguridad de cada una.",
+  "variantes": [
+    {
+      "nombre": "hay presa",
+      "state": {
+        "ruido": "golpe metálico fuerte a unos 15 metros, a la izquierda",
+        "olor": "sudor humano reciente, intenso, viene de la derecha",
+        "luz": "anochecer, poca visibilidad",
+        "distancia_presa": "unos 8 metros"
+      }
+    },
+    {
+      "nombre": "no hay nada",
+      "state": {
+        "ruido": "viento entre los coches",
+        "olor": "ninguno",
+        "luz": "mediodía",
+        "distancia_presa": "no hay presa a la vista"
+      }
+    }
+  ],
+  "state": {
+    "ruido": "golpe metálico fuerte a unos 15 metros, a la izquierda",
+    "olor": "sudor humano reciente, intenso, viene de la derecha",
+    "luz": "anochecer, poca visibilidad",
+    "distancia_presa": "unos 8 metros"
+  },
+  "questions": {
+    "criterios_vagos": {
+      "type": "choice",
+      "instructions": "¿Qué hace el zombi a continuación?",
+      "criteria": {
+        "atacar": "cuando le apetezca",
+        "seguir": "cuando le parezca bien",
+        "ignorar": "si no tiene ganas",
+        "vagar": "el resto del tiempo"
+      }
+    },
+    "criterios_observables": {
+      "type": "choice",
+      "instructions": "¿Qué hace el zombi a continuación?",
+      "criteria": {
+        "atacar": "hay un humano vivo muy cerca y su olor es intenso",
+        "seguir": "hay rastro de humano, pero lejos o poco claro",
+        "ignorar": "solo hay ruidos o estímulos sin rastro de humano",
+        "vagar": "no hay estímulos relevantes a su alrededor"
+      }
+    }
+  }
+}

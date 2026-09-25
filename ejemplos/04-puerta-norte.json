@@ -1,0 +1,69 @@
+{
+  "titulo": "La puerta norte",
+  "modo": "predict",
+  "etiqueta": "umbral: máquina o humano",
+  "resumen": "Alguien llama a la puerta. Nuestro analizador de infección debe estar seguro al 90 % o más para decidir por si mismo; si no, deberá acercase quien esté de guardia. Prueba con la niña del arañazo antes de fiarte del umbral.",
+  "umbral": {
+    "question": "decision",
+    "min": 0.9
+  },
+  "variantes": [
+    {
+      "nombre": "la de la venda",
+      "state": {
+        "aspecto": "mujer adulta, ropa rota, cojea de la pierna izquierda",
+        "heridas": "venda con sangre seca en el antebrazo derecho",
+        "comportamiento": "habla con frases completas, pide agua, responde a su nombre",
+        "compania": "viene sola"
+      }
+    },
+    {
+      "nombre": "el de la carta",
+      "state": {
+        "aspecto": "hombre joven, cansado, mochila grande",
+        "heridas": "ninguna visible",
+        "comportamiento": "habla con normalidad y trae una carta del refugio del polideportivo",
+        "compania": "viene solo"
+      }
+    },
+    {
+      "nombre": "el que gruñe",
+      "state": {
+        "aspecto": "hombre mayor, piel grisácea, ojos vidriosos",
+        "heridas": "marca de dientes en el cuello",
+        "comportamiento": "no contesta, gruñe y golpea la puerta",
+        "compania": "viene solo"
+      }
+    },
+    {
+      "nombre": "la niña del arañazo",
+      "state": {
+        "aspecto": "niña de unos diez años con su padre",
+        "heridas": "arañazo reciente en la mejilla, dice que fue con una valla",
+        "comportamiento": "llora pero responde a las preguntas",
+        "compania": "su padre, sin heridas"
+      }
+    }
+  ],
+  "state": {
+    "aspecto": "mujer adulta, ropa rota, cojea de la pierna izquierda",
+    "heridas": "venda con sangre seca en el antebrazo derecho",
+    "comportamiento": "habla con frases completas, pide agua, responde a su nombre",
+    "compania": "viene sola"
+  },
+  "questions": {
+    "decision": {
+      "type": "choice",
+      "instructions": "¿Qué hace la guardia con la persona que espera en la puerta?",
+      "criteria": {
+        "admitir": "persona sana, sin heridas sospechosas, que se comunica con normalidad",
+        "cuarentena": "persona que se comunica con normalidad pero tiene heridas sin explicar",
+        "rechazar": "señales claras de infección: no habla, gruñe o tiene mordeduras visibles"
+      }
+    },
+    "mordedura": {
+      "type": "noul",
+      "instructions": "¿Hay indicios de una mordedura?"
+    }
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "titulo": "Navajas: ¿Albacete o Puertollano?",
+  "modo": "predict",
+  "etiqueta": "el orden de las opciones",
+  "resumen": "El sistema no es un experto en cultura general. Lo intentamos usar así porque hacen falta navajas para defender el refugio, pero no recordamos donde se fabrican las mejores. Pulsa barajarOpciones(): con un orden nos manda a Albacete y con el otro, a Puertollano.",
+  "question_id": "destino",
+  "variantes": [
+    {
+      "nombre": "expedición",
+      "state": "Necesitamos navajas y cuchillos para defender el refugio.",
+      "questions": {
+        "destino": {
+          "type": "choice",
+          "instructions": "¿A qué ciudad vamos a buscarlos?",
+          "criteria": [
+            "Albacete",
+            "Puertollano"
+          ]
+        }
+      }
+    },
+    {
+      "nombre": "cultura general",
+      "state": "Pregunta de cultura general para pasar el rato en la guardia.",
+      "questions": {
+        "destino": {
+          "type": "choice",
+          "instructions": "¿Qué ciudad es famosa por sus navajas?",
+          "criteria": [
+            "Albacete",
+            "Puertollano"
+          ]
+        }
+      }
+    },
+    {
+      "nombre": "capital de provincia",
+      "state": "Pregunta de cultura general para pasar el rato en la guardia.",
+      "questions": {
+        "destino": {
+          "type": "choice",
+          "instructions": "¿Cuál es la capital de la provincia de Ciudad Real?",
+          "criteria": [
+            "Ciudad Real",
+            "Puertollano"
+          ]
+        }
+      }
+    }
+  ],
+  "state": "Necesitamos navajas y cuchillos para defender el refugio.",
+  "questions": {
+    "destino": {
+      "type": "choice",
+      "instructions": "¿A qué ciudad vamos a buscarlos?",
+      "criteria": [
+        "Albacete",
+        "Puertollano"
+      ]
+    }
+  }
+}

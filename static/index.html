@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Terminal del refugio</title>
+<link rel="stylesheet" href="/static/terminal.css">
+</head>
+<body>
+<div class="crt">
+
+  <!-- Pantalla de arranque: se ve mientras el cerebro descarga o carga el modelo. -->
+  <section id="arranque" class="arranque" aria-live="polite">
+    <div class="caja caja-arranque">
+      <h1 class="titulo-arranque">CerebroZombi.cargar()</h1>
+      <ul id="pasos" class="pasos"></ul>
+      <div class="progreso">
+        <div class="barra"><i id="barra-arranque"></i></div>
+        <span id="porcentaje">0%</span>
+      </div>
+      <p class="reloj"><span class="spinner" aria-hidden="true"></span> Tiempo: <span id="segundos">0</span> s</p>
+      <div id="fallo" class="caja alerta" hidden></div>
+    </div>
+  </section>
+
+  <header class="cabecera">
+    <div class="marca">
+      <span class="marca-nombre">TERMINAL DEL REFUGIO</span>
+      <span class="marca-sub">central eléctrica · sector C-3 · Z-DAY +21</span>
+    </div>
+    <div id="estado-cerebro" class="estado-cerebro">CEREBRO: ···</div>
+  </header>
+
+  <main class="principal">
+    <nav class="menu caja" aria-label="Situaciones">
+      <h2>SITUACIONES</h2>
+      <ol id="lista-ejemplos" class="lista-ejemplos"></ol>
+      <p class="pie-menu">Laya · modelo de decisión<br>sin conexión desde el arranque</p>
+    </nav>
+
+    <section class="trabajo">
+      <article class="caja">
+        <h2 id="titulo-ejemplo">···</h2>
+        <p id="resumen-ejemplo" class="resumen"></p>
+        <div id="variantes" class="variantes" hidden></div>
+      </article>
+
+      <div class="columnas">
+        <article class="caja">
+          <div class="cabecera-caja">
+            <h3 id="etiqueta-estado">ESTADO</h3>
+            <span class="pista">lo que se percibe · texto o JSON</span>
+          </div>
+          <textarea id="estado" spellcheck="false" aria-labelledby="etiqueta-estado"></textarea>
+        </article>
+
+        <article class="caja">
+          <div class="cabecera-caja">
+            <h3>PREGUNTAS</h3>
+            <button id="alternar-json" class="enlace" type="button">[editar JSON]</button>
+          </div>
+          <div id="preguntas-vista" class="preguntas-vista"></div>
+          <textarea id="preguntas" spellcheck="false" hidden aria-label="Preguntas en JSON"></textarea>
+        </article>
+      </div>
+
+      <div class="acciones">
+        <button id="evaluar" class="boton" type="button" disabled>evaluar()</button>
+        <button id="barajar" class="boton" type="button" disabled>barajarOpciones()</button>
+        <span id="aviso" class="aviso" role="status"></span>
+      </div>
+
+      <article class="caja salida">
+        <div class="cabecera-caja">
+          <h3>DECISIÓN</h3>
+          <span id="meta" class="pista"></span>
+        </div>
+        <div id="resultados" class="resultados">
+          <p class="vacio">&gt; esperando órdenes_</p>
+        </div>
+      </article>
+    </section>
+  </main>
+</div>
+<script src="/static/terminal.js"></script>
+</body>
+</html>

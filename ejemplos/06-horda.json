@@ -1,0 +1,60 @@
+{
+  "titulo": "La horda del puente",
+  "modo": "horda",
+  "etiqueta": "muchos estados a la vez",
+  "resumen": "Ocho zombis cruzan el puente. Hay un momento en el que todos reciben estímulos similares de forma simultánea, y otro en el que según se acercan lo van percibiendo. Revisa la comparación de tiempos. Y analiza la tabla: hay alguno que incluso ataca al vacío.",
+  "states": [
+    {
+      "olor": "sudor humano intenso muy cerca",
+      "ruido": "pasos a 3 metros",
+      "vista": "una silueta se mueve detrás del coche"
+    },
+    {
+      "olor": "ninguno",
+      "ruido": "viento entre los coches",
+      "vista": "nada se mueve"
+    },
+    {
+      "olor": "rastro humano débil, de hace horas",
+      "ruido": "nada",
+      "vista": "huellas de botas en el barro"
+    },
+    {
+      "olor": "sangre fresca a unos 5 metros",
+      "ruido": "alguien respira agitado",
+      "vista": "un superviviente herido intenta esconderse"
+    },
+    {
+      "olor": "ninguno",
+      "ruido": "una lata rueda por el asfalto",
+      "vista": "nada se mueve"
+    },
+    {
+      "olor": "humo de una hoguera lejana",
+      "ruido": "voces a lo lejos",
+      "vista": "un resplandor en la colina"
+    },
+    {
+      "olor": "ninguno",
+      "ruido": "ninguno",
+      "vista": "el puente vacío"
+    },
+    {
+      "olor": "sudor humano reciente",
+      "ruido": "un motor arranca a 20 metros",
+      "vista": "un coche con gente dentro"
+    }
+  ],
+  "questions": {
+    "accion": {
+      "type": "choice",
+      "instructions": "¿Qué hace el zombi a continuación según lo que percibe?",
+      "criteria": {
+        "atacar": "hay un humano vivo muy cerca y su olor es intenso",
+        "seguir": "hay rastro de humano, pero lejos o poco claro",
+        "ignorar": "solo hay ruidos o estímulos sin rastro de humano",
+        "vagar": "no hay estímulos relevantes a su alrededor"
+      }
+    }
+  }
+}

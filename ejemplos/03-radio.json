@@ -1,0 +1,63 @@
+{
+  "titulo": "La radio del refugio",
+  "modo": "predict",
+  "etiqueta": "el contexto importa",
+  "resumen": "La radio falla y no se reciben bien las transmisiones. Con «...no abráis...» no se tiene gran cosa; pero si se aporta la frase anterior, cambia todo. Compara las variantes.",
+  "variantes": [
+    {
+      "nombre": "tras un aviso",
+      "state": {
+        "segmento_anterior": "¡Una horda viene por la puerta norte!",
+        "segmento_actual": "...no abráis..."
+      }
+    },
+    {
+      "nombre": "tras una oferta",
+      "state": {
+        "segmento_anterior": "Tenemos latas de sobra y queremos medicinas.",
+        "segmento_actual": "...no abráis..."
+      }
+    },
+    {
+      "nombre": "sin contexto",
+      "state": {
+        "segmento_anterior": "",
+        "segmento_actual": "...no abráis..."
+      }
+    },
+    {
+      "nombre": "socorro",
+      "state": {
+        "segmento_anterior": "",
+        "segmento_actual": "Aquí el refugio del polideportivo, tenemos tres heridos y nos quedamos sin agua, necesitamos ayuda."
+      }
+    },
+    {
+      "nombre": "grupo en la avenida",
+      "state": {
+        "segmento_anterior": "",
+        "segmento_actual": "Un grupo grande baja por la avenida hacia el puente, más de cincuenta."
+      }
+    }
+  ],
+  "state": {
+    "segmento_anterior": "¡Una horda viene por la puerta norte!",
+    "segmento_actual": "...no abráis..."
+  },
+  "questions": {
+    "tipo": {
+      "type": "choice",
+      "instructions": "¿Qué tipo de transmisión es el segmento actual?",
+      "criteria": {
+        "socorro": "alguien pide ayuda o rescate",
+        "aviso_horda": "se informa de zombis en movimiento o de una zona peligrosa",
+        "comercio": "se ofrece o se pide intercambiar suministros",
+        "ruido": "interferencias o frases sin información útil"
+      }
+    },
+    "ubicacion": {
+      "type": "noul",
+      "instructions": "¿El segmento actual menciona un lugar concreto?"
+    }
+  }
+}

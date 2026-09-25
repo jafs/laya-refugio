@@ -1,0 +1,61 @@
+{
+  "titulo": "El zombi del parking",
+  "modo": "predict",
+  "etiqueta": "choice + score + noul",
+  "resumen": "Hay un infectado con camisa de oficinista en el parking. Recibe estímulos y se hace tres preguntas para decidir. En la variante de la lata deja de atacar... aunque sigue convencido de que huele a humano.",
+  "variantes": [
+    {
+      "nombre": "sudor a 8 metros",
+      "state": {
+        "ruido": "golpe metálico fuerte a unos 15 metros, a la izquierda",
+        "olor": "sudor humano reciente, intenso, viene de la derecha",
+        "luz": "anochecer, poca visibilidad",
+        "distancia_presa": "unos 8 metros"
+      }
+    },
+    {
+      "nombre": "solo una lata",
+      "state": {
+        "ruido": "una lata rueda por el asfalto a unos 10 metros",
+        "olor": "ninguno",
+        "luz": "anochecer, poca visibilidad",
+        "distancia_presa": "no hay presa a la vista"
+      }
+    }
+  ],
+  "state": {
+    "ruido": "golpe metálico fuerte a unos 15 metros, a la izquierda",
+    "olor": "sudor humano reciente, intenso, viene de la derecha",
+    "luz": "anochecer, poca visibilidad",
+    "distancia_presa": "unos 8 metros"
+  },
+  "questions": {
+    "accion": {
+      "type": "choice",
+      "instructions": "¿Qué hace el zombi a continuación según lo que percibe?",
+      "criteria": {
+        "atacar": "hay un humano vivo muy cerca y su olor es intenso",
+        "seguir": "hay rastro de humano, pero lejos o poco claro",
+        "ignorar": "solo hay ruidos o estímulos sin rastro de humano",
+        "vagar": "no hay estímulos relevantes a su alrededor"
+      }
+    },
+    "hambre": {
+      "type": "score",
+      "instructions": "¿Qué intensidad tiene el estímulo de presa que percibe el zombi?",
+      "criteria": [
+        "ningún estímulo",
+        "estímulo débil",
+        "estímulo fuerte e inmediato"
+      ]
+    },
+    "humano_cerca": {
+      "type": "noul",
+      "instructions": "¿Percibe el zombi el olor de un humano vivo?",
+      "criteria": {
+        "true": "el estado menciona olor humano reciente",
+        "false": "no hay olor humano en el estado"
+      }
+    }
+  }
+}
