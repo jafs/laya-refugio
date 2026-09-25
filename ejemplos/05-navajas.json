@@ -2,7 +2,7 @@
   "titulo": "Navajas: ¿Albacete o Puertollano?",
   "modo": "predict",
   "etiqueta": "el orden de las opciones",
-  "resumen": "El sistema no es un experto en cultura general. Lo intentamos usar así porque hacen falta navajas para defender el refugio, pero no recordamos donde se fabrican las mejores. Pulsa barajarOpciones(): con un orden nos manda a Albacete y con el otro, a Puertollano.",
+  "resumen": "El sistema no es un experto en cultura general. Lo intentamos usar así porque hacen falta navajas para defender el refugio, pero no recordamos dónde se fabrican las mejores. Pulsa barajarOpciones(): con un orden nos manda a Albacete y con el otro, a Puertollano.",
   "question_id": "destino",
   "variantes": [
     {
