@@ -318,7 +318,7 @@ function pintarBarajado(datos, preguntas) {
   $("meta").textContent = `${total} rondas`;
 }
 
-function pintarHorda(datos, preguntas) {
+function pintarHorda(datos, preguntas, estados) {
   const id = preguntaBarajable(preguntas) || Object.keys(preguntas)[0];
   const recuento = {};
   const filas = datos.resultados.map((res, i) => {
@@ -326,7 +326,9 @@ function pintarHorda(datos, preguntas) {
     const valor = r.type === "choice" ? r.choice : r.type === "score" ? num(r.score) : (r.noul >= 0.5 ? "SÍ" : "NO");
     const p = r.type === "choice" ? r.probabilities[r.choice] : r.answer_confidence;
     recuento[valor] = (recuento[valor] || 0) + 1;
-    return `<tr><td>zombi ${String(i + 1).padStart(2, "0")}</td><td>${escapar(valor)}</td><td>${num(p)}</td></tr>`;
+    const e = estados[i];
+    const percibe = typeof e === "string" ? e : Object.values(e ?? {}).join(" · ");
+    return `<tr><td>zombi ${String(i + 1).padStart(2, "0")}</td><td class="percibe" title="${escapar(percibe)}">${escapar(percibe)}</td><td>${escapar(valor)}</td><td>${num(p)}</td></tr>`;
   }).join("");
   const n = datos.resultados.length;
   const resumen = Object.entries(recuento).sort((a, b) => b[1] - a[1])
@@ -349,7 +351,7 @@ function pintarHorda(datos, preguntas) {
       ${resumen}
     </section>
     ${tiempos}
-    <table class="tabla"><thead><tr><th>zombi</th><th>decisión</th><th>prob.</th></tr></thead><tbody>${filas}</tbody></table>`;
+    <table class="tabla"><thead><tr><th>zombi</th><th>percibe</th><th>decisión</th><th>prob.</th></tr></thead><tbody>${filas}</tbody></table>`;
   $("meta").textContent = `${n} zombis · ${Math.round(datos.lote_ms)} ms`;
 }
 
@@ -375,7 +377,7 @@ async function ejecutar(accion) {
       });
       pintarBarajado(datos, preguntas);
     } else if (ui.actual?.modo === "horda") {
-      pintarHorda(await api("/api/horde", { states: estado, questions: preguntas }), preguntas);
+      pintarHorda(await api("/api/horde", { states: estado, questions: preguntas }), preguntas, estado);
     } else {
       pintarDecision(await api("/api/predict", { state: estado, questions: preguntas }), preguntas);
     }

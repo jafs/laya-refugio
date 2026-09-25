@@ -52,7 +52,8 @@ h3 { font-size: 13px; }
 /* ---------------------------------------------------------------- cabecera */
 .cabecera {
   display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;
-  padding: 12px 20px; border-bottom: 1px solid var(--linea);
+  /* En pantallas anchas, alineada con el contenido (máximo 1400px) en lugar de ir de lado a lado. */
+  padding: 12px max(20px, calc((100% - 1400px) / 2 + 20px)); border-bottom: 1px solid var(--linea);
 }
 .marca { display: flex; flex-direction: column; }
 .marca-nombre { color: var(--fosforo-vivo); font-weight: 600; letter-spacing: .12em; }
@@ -140,7 +141,7 @@ textarea:focus, button:focus-visible { outline: 1px solid var(--fosforo-vivo); o
 .respuesta { border-left: 2px solid var(--linea); padding-left: 12px; }
 .respuesta .titular { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
 .respuesta .veredicto { color: var(--fosforo-vivo); font-size: 16px; font-weight: 600; }
-.fila { display: grid; grid-template-columns: minmax(90px, 200px) auto auto; justify-content: start; gap: 12px; align-items: center; }
+.fila { display: grid; grid-template-columns: minmax(90px, 280px) auto auto; justify-content: start; gap: 12px; align-items: center; }
 .fila .nombre { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fila .bloques { white-space: pre; overflow: hidden; letter-spacing: -1px; }
 .fila .valor { color: var(--fosforo-tenue); font-variant-numeric: tabular-nums; }
@@ -151,6 +152,7 @@ textarea:focus, button:focus-visible { outline: 1px solid var(--fosforo-vivo); o
 .tabla { width: 100%; border-collapse: collapse; font-size: 13px; }
 .tabla th, .tabla td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--linea); }
 .tabla th { color: var(--fosforo-tenue); font-weight: 500; }
+.tabla td.percibe { color: var(--fosforo-tenue); max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tabla td.distinta { color: var(--alerta); text-shadow: none; }
 
 .sello { display: inline-block; border: 1px solid var(--linea-viva); border-radius: 4px; padding: 4px 10px; color: var(--fosforo-vivo); }
