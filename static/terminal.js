@@ -10,6 +10,8 @@ const ui = {
   listo: false,
   ocupado: false,
   inicio: Date.now(),
+  modo: "predict",          // "predict" o "horda": cómo se evalúa lo que hay en pantalla
+  confirmarBorrado: null,
 };
 
 // ------------------------------------------------------------------ utilidades
@@ -26,16 +28,21 @@ function bloques(p) {
 
 const num = (v, d = 2) => Number(v).toFixed(d).replace(".", ",");
 const pct = (v) => `${Math.round(v * 100)} %`;
+const zombis = (n) => `${n} ${n === 1 ? "zombi" : "zombis"}`;
 
-async function api(ruta, cuerpo) {
-  const opciones = cuerpo === undefined ? {} : {
-    method: "POST",
+async function api(ruta, cuerpo, metodo) {
+  const opciones = cuerpo === undefined && !metodo ? {} : {
+    method: metodo || "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(cuerpo),
+    body: cuerpo === undefined ? undefined : JSON.stringify(cuerpo),
   };
   const r = await fetch(ruta, opciones);
   const datos = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(datos.detail || `HTTP ${r.status}`);
+  if (!r.ok) {
+    // FastAPI devuelve los errores de validación como lista; nos quedamos con los mensajes.
+    const detalle = Array.isArray(datos.detail) ? datos.detail.map((d) => d.msg).join("; ") : datos.detail;
+    throw new Error(detalle || `HTTP ${r.status}`);
+  }
   return datos;
 }
 
@@ -127,11 +134,17 @@ async function vigilarCerebro() {
 
 // ------------------------------------------------------------------ situaciones
 function pintarLista() {
-  $("lista-ejemplos").innerHTML = ui.ejemplos.map((e, i) => `
+  const boton = (e, i, marca) => `
     <li><button type="button" data-i="${i}" aria-current="${e === ui.actual}">
-      ${String(i + 1).padStart(2, "0")} ${escapar(e.titulo)}
-      <span class="modo">${escapar(e.etiqueta || e.modo)}</span>
-    </button></li>`).join("");
+      ${marca} ${escapar(e.titulo)}
+      <span class="modo">${escapar(e.etiqueta || (e.modo === "horda" ? "horda" : "una situación"))}</span>
+    </button></li>`;
+  const fijos = [];
+  const propias = [];
+  ui.ejemplos.forEach((e, i) => (e.propio ? propias : fijos).push([e, i]));
+  $("lista-ejemplos").innerHTML = fijos.map(([e, i], n) => boton(e, i, String(n + 1).padStart(2, "0"))).join("");
+  $("lista-propias").innerHTML = propias.map(([e, i]) => boton(e, i, "◆")).join("");
+  $("sin-propias").hidden = propias.length > 0;
 }
 
 function seleccionar(ejemplo) {
@@ -139,9 +152,16 @@ function seleccionar(ejemplo) {
   pintarLista();
   $("titulo-ejemplo").textContent = ejemplo.titulo;
   $("resumen-ejemplo").textContent = ejemplo.resumen || "";
-  const horda = ejemplo.modo === "horda";
-  $("etiqueta-estado").textContent = horda ? "ESTADOS DE LA HORDA" : "ESTADO";
-  $("evaluar").textContent = horda ? "soltarHorda()" : "evaluar()";
+  const propia = Boolean(ejemplo.propio);
+  $("marca-propia").hidden = !propia;
+  $("caja-ejemplo").classList.toggle("es-propia", propia);
+  $("guardar").hidden = !propia;
+  $("borrar").hidden = !propia || Boolean(ejemplo.nuevo);
+  cerrarFormulario();
+  reiniciarBorrado();
+  ui.modo = ejemplo.modo === "horda" ? "horda" : "predict";
+  pintarModo();
+  const horda = ui.modo === "horda";
 
   const variantes = ejemplo.variantes || [];
   $("variantes").hidden = !variantes.length;
@@ -160,6 +180,27 @@ function elegirVariante(i) {
   const v = ui.actual.variantes[i];
   document.querySelectorAll(".variante").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === String(i))));
   cargarDatos(v.state ?? ui.actual.state, v.questions ?? ui.actual.questions);
+}
+
+function pintarModo() {
+  const horda = ui.modo === "horda";
+  $("modo-horda").checked = horda;
+  $("etiqueta-estado").textContent = horda ? "ESTADOS DE LA HORDA" : "ESTADO";
+  $("evaluar").textContent = horda ? "soltarHorda()" : "evaluar()";
+  actualizarBotones();
+}
+
+// Al pasar a horda, el estado actual se convierte en el primer zombi de la lista; al volver, se
+// queda solo el primero.
+function cambiarModo(horda) {
+  const texto = $("estado").value.trim();
+  let valor;
+  try { valor = JSON.parse(texto); } catch { valor = texto; }
+  if (horda && !Array.isArray(valor)) valor = [valor];
+  if (!horda && Array.isArray(valor)) valor = valor[0] ?? "";
+  $("estado").value = typeof valor === "string" ? valor : JSON.stringify(valor, null, 2);
+  ui.modo = horda ? "horda" : "predict";
+  pintarModo();
 }
 
 function cargarDatos(estado, preguntas) {
@@ -183,7 +224,7 @@ function leerPreguntas() {
 
 function leerEstado() {
   const texto = $("estado").value.trim();
-  if (ui.actual?.modo === "horda") {
+  if (ui.modo === "horda") {
     let estados;
     try { estados = JSON.parse(texto); } catch { estados = null; }
     if (!Array.isArray(estados) || !estados.length) {
@@ -238,7 +279,7 @@ function actualizarBotones() {
   try { barajable = Boolean(preguntaBarajable(leerPreguntas())); } catch { /* JSON a medio escribir */ }
   const activo = ui.listo && !ui.ocupado && ui.actual;
   $("evaluar").disabled = !activo;
-  $("barajar").disabled = !activo || !barajable || ui.actual?.modo === "horda";
+  $("barajar").disabled = !activo || !barajable || ui.modo === "horda";
 }
 
 // ------------------------------------------------------------------ resultados
@@ -338,7 +379,7 @@ function pintarHorda(datos, preguntas, estados) {
   if (datos.uno_a_uno_ms) {
     const max = Math.max(datos.lote_ms, datos.uno_a_uno_ms);
     tiempos = `<section class="respuesta">
-      <div class="titular"><span>tiempo total para ${n} zombis</span></div>
+      <div class="titular"><span>tiempo total para ${zombis(n)}</span></div>
       <div class="fila"><span class="nombre">en lote</span><span class="bloques">${bloques(datos.lote_ms / max)}</span><span class="valor">${Math.round(datos.lote_ms)} ms</span></div>
       <div class="fila"><span class="nombre">uno a uno</span><span class="bloques">${bloques(datos.uno_a_uno_ms / max)}</span><span class="valor">${Math.round(datos.uno_a_uno_ms)} ms</span></div>
       <p class="detalle">${num(datos.lote_ms_por_estado, 1)} ms por zombi en lote, ${num(datos.uno_a_uno_ms_por_estado, 1)} ms uno a uno</p>
@@ -352,7 +393,7 @@ function pintarHorda(datos, preguntas, estados) {
     </section>
     ${tiempos}
     <table class="tabla"><thead><tr><th>zombi</th><th>percibe</th><th>decisión</th><th>prob.</th></tr></thead><tbody>${filas}</tbody></table>`;
-  $("meta").textContent = `${n} zombis · ${Math.round(datos.lote_ms)} ms`;
+  $("meta").textContent = `${zombis(n)} · ${Math.round(datos.lote_ms)} ms`;
 }
 
 // ------------------------------------------------------------------ acciones
@@ -376,7 +417,7 @@ async function ejecutar(accion) {
         state: estado, questions: preguntas, question_id: preguntaBarajable(preguntas), rondas: 8,
       });
       pintarBarajado(datos, preguntas);
-    } else if (ui.actual?.modo === "horda") {
+    } else if (ui.modo === "horda") {
       pintarHorda(await api("/api/horde", { states: estado, questions: preguntas }), preguntas, estado);
     } else {
       pintarDecision(await api("/api/predict", { state: estado, questions: preguntas }), preguntas);
@@ -390,10 +431,127 @@ async function ejecutar(accion) {
   }
 }
 
+// ------------------------------------------------------------------ modo libre
+const PLANTILLA = {
+  titulo: "Prueba nueva",
+  resumen: "Modo libre: describe lo que se percibe, define tus preguntas y pulsa evaluar(). "
+    + "Si el resultado merece la pena, guárdala con guardar().",
+  modo: "predict",
+  propio: true,
+  nuevo: true,
+  state: { situacion: "un zombi olfatea la puerta del almacén de comida y empuja con el hombro" },
+  questions: {
+    decision: {
+      type: "choice",
+      instructions: "¿Qué hacemos con el almacén?",
+      criteria: {
+        reforzar: "la puerta aguanta, pero hay riesgo de que ceda",
+        evacuar: "la puerta está a punto de ceder o hay muchos zombis",
+        ignorar: "no hay peligro real para el almacén",
+      },
+    },
+    peligro: { type: "noul", instructions: "¿Hay peligro inmediato para el refugio?" },
+  },
+};
+
+function nuevaPrueba() {
+  seleccionar(structuredClone(PLANTILLA));
+  if ($("preguntas").hidden) $("alternar-json").click();
+  $("estado").focus();
+}
+
+function abrirFormulario() {
+  const a = ui.actual;
+  $("campo-titulo").value = a.nuevo ? "" : `${a.titulo} (${a.propio ? "copia" : "mi versión"})`;
+  $("campo-resumen").value = a.nuevo ? "" : a.resumen || "";
+  $("form-guardar").hidden = false;
+  $("campo-titulo").focus();
+}
+
+function cerrarFormulario() {
+  $("form-guardar").hidden = true;
+}
+
+function datosActuales(titulo, resumen) {
+  const datos = { titulo, resumen, modo: ui.modo, questions: leerPreguntas() };
+  datos[ui.modo === "horda" ? "states" : "state"] = leerEstado();
+  // Si partimos de un ejemplo con umbral o con pregunta preferida para barajar, se conservan.
+  if (ui.actual?.umbral) datos.umbral = ui.actual.umbral;
+  if (ui.actual?.question_id) datos.question_id = ui.actual.question_id;
+  return datos;
+}
+
+async function guardarPrueba(titulo, resumen, id) {
+  let datos;
+  try {
+    datos = datosActuales(titulo, resumen);
+  } catch (e) {
+    avisar(e.message, true);
+    return;
+  }
+  try {
+    const guardada = await api(id ? `/api/custom/${id}` : "/api/custom", datos, id ? "PUT" : "POST");
+    await recargar(guardada.id);
+    avisar(`guardada en mis pruebas: ${guardada.titulo}`);
+  } catch (e) {
+    avisar(`No se pudo guardar: ${e.message}`, true);
+  }
+}
+
+async function recargar(idPropia) {
+  ui.ejemplos = await api("/api/examples");
+  const elegida = ui.ejemplos.find((e) => e.propio && e.id === idPropia);
+  if (elegida) seleccionar(elegida);
+  else pintarLista();
+}
+
+function reiniciarBorrado() {
+  clearTimeout(ui.confirmarBorrado);
+  ui.confirmarBorrado = null;
+  $("borrar").textContent = "[borrar()]";
+}
+
+async function borrarPrueba() {
+  if (!ui.confirmarBorrado) {
+    $("borrar").textContent = "[¿seguro? pulsa otra vez]";
+    ui.confirmarBorrado = setTimeout(reiniciarBorrado, 4000);
+    return;
+  }
+  reiniciarBorrado();
+  const { id, titulo } = ui.actual;
+  try {
+    await api(`/api/custom/${id}`, undefined, "DELETE");
+    await recargar(null);
+    seleccionar(ui.ejemplos[0]);
+    avisar(`borrada: ${titulo}`);
+  } catch (e) {
+    avisar(`No se pudo borrar: ${e.message}`, true);
+  }
+}
+
 // ------------------------------------------------------------------ arranque de la página
-$("lista-ejemplos").addEventListener("click", (ev) => {
-  const boton = ev.target.closest("button[data-i]");
-  if (boton) seleccionar(ui.ejemplos[Number(boton.dataset.i)]);
+for (const lista of ["lista-ejemplos", "lista-propias"]) {
+  $(lista).addEventListener("click", (ev) => {
+    const boton = ev.target.closest("button[data-i]");
+    if (boton) seleccionar(ui.ejemplos[Number(boton.dataset.i)]);
+  });
+}
+
+$("nueva").addEventListener("click", nuevaPrueba);
+$("guardar-como").addEventListener("click", abrirFormulario);
+$("cancelar").addEventListener("click", cerrarFormulario);
+$("borrar").addEventListener("click", borrarPrueba);
+$("modo-horda").addEventListener("change", (ev) => cambiarModo(ev.target.checked));
+$("guardar").addEventListener("click", () => {
+  const a = ui.actual;
+  if (a.nuevo) abrirFormulario();
+  else guardarPrueba(a.titulo, a.resumen || "", a.id);
+});
+$("form-guardar").addEventListener("submit", (ev) => {
+  ev.preventDefault();
+  const titulo = $("campo-titulo").value.trim();
+  if (!titulo) return;
+  guardarPrueba(titulo, $("campo-resumen").value.trim(), null);
 });
 
 $("variantes").addEventListener("click", (ev) => {

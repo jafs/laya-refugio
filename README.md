@@ -47,6 +47,14 @@ La primera vez se descargará el checkpoint multilingüe (unos 650 MB) a la cach
 
 La versión del modelo está fijada en `REVISION` (`app/cerebro.py`), la misma con la que se probaron los ejemplos. Si en tu caché hay otra más antigua, se descarga la buena una vez y listo.
 
+## Modo libre: tus propias pruebas
+
+Los ejemplos del artículo están muy bien, pero el refugio es tuyo. Con `+ nuevaPrueba()` empiezas de cero: escribes lo que se percibe, defines tus preguntas y pulsas `evaluar()`. Si marcas la casilla **horda**, el estado pasa a ser una lista con un zombi por elemento.
+
+Cuando algo merezca la pena, `guardar()` le pide un nombre y una descripción y lo guarda en **MIS PRUEBAS**. Las verás en ámbar y con borde discontinuo, para que no se confundan con los ejemplos fijos. También puedes partir de cualquier ejemplo, cambiarlo a tu gusto y usar `guardarComo()`: si el ejemplo tenía umbral (como la puerta norte), tu versión lo conserva.
+
+Se guardan como JSON en `mis-pruebas/`, que git ignora, así que no se mezclan con el repositorio. El formato es el mismo que el de `ejemplos/`: si copias una de tus pruebas allí, pasa a ser un ejemplo fijo más.
+
 ## Configuración
 
 Siempre puedes personalizar todo aún más, si escribes un .env con alguna de estas variables:
@@ -58,13 +66,17 @@ Siempre puedes personalizar todo aún más, si escribes un .env con alguna de es
 | `LAYA_DEVICE` | `auto` | `auto` (CUDA o MPS si hay, si no CPU), `cpu`, `cuda`, `cuda:1`... |
 | `LAYA_PRECISION` | `auto` | `auto`, `fp16` o `fp32`. Laya usa fp16 en GPU, pero en las tarjetas que no tienen tensor cores el fp16 va varias veces más lento que el fp32; en modo `auto` se detectan y se usa fp32. |
 | `PORT` | `8000` | Puerto HTTP. |
+| `LAYA_MIS_PRUEBAS` | `mis-pruebas` | Carpeta donde se guardan las pruebas del modo libre. |
 
 ## API
 
 | Método | Ruta | Qué hace |
 | --- | --- | --- |
 | `GET` | `/api/status` | Estado del cerebro: `comprobando`, `descargando` (con MB), `cargando`, `listo` o `error`. |
-| `GET` | `/api/examples` | Los ejemplos de `ejemplos/*.json`. |
+| `GET` | `/api/examples` | Los ejemplos de `ejemplos/*.json` y, detrás, las pruebas propias (con `"propio": true`). |
+| `POST` | `/api/custom` | Guarda una prueba propia nueva: `titulo`, `resumen`, `modo` (`predict` u `horda`), `state` o `states` y `questions`. |
+| `PUT` | `/api/custom/{id}` | Sobrescribe una prueba propia. |
+| `DELETE` | `/api/custom/{id}` | Borra una prueba propia. |
 | `POST` | `/api/predict` | `{"state": ..., "questions": {...}}` → respuesta de Laya, checkpoint elegido y `latency_ms`. |
 | `POST` | `/api/horde` | `{"states": [...], "questions": {...}}` → las mismas preguntas para muchos estados en lotes, con el tiempo comparado contra hacerlo uno a uno. |
 | `POST` | `/api/permute` | `{"state": ..., "questions": {...}, "question_id": "accion"}` → repite una pregunta `choice` con las opciones en distinto orden para ver si cambia la respuesta. Spoiler: a veces sí. |
@@ -86,6 +98,7 @@ Formato de las preguntas:
 ```text
 app/cerebro.py   descarga única, carga en segundo plano, Router, horda y barajado
 app/main.py      FastAPI: endpoints y ficheros estáticos
+app/pruebas.py   pruebas propias del modo libre (mis-pruebas/*.json)
 ejemplos/        situaciones del refugio en JSON
 static/          la terminal (HTML + JS, sin compilación)
 tests/           tests de la API con un cerebro falso (no cargan el modelo)

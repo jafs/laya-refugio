@@ -102,3 +102,54 @@ def test_ejemplos_validos():
     for e in ejemplos:
         assert {"id", "titulo", "modo"} <= set(e)
         assert e["questions"]
+
+
+# ------------------------------------------------------------------ modo libre
+PRUEBA = {"titulo": "Mi zombi de prueba", "resumen": "Uno que solo come coles",
+          "state": {"olor": "coles"}, "questions": PREGUNTAS}
+
+
+@pytest.fixture
+def cliente_libre(tmp_path, monkeypatch):
+    monkeypatch.setenv("LAYA_MIS_PRUEBAS", str(tmp_path / "mis-pruebas"))
+    return TestClient(crear_app(CerebroFalso()))
+
+
+def test_crear_listar_y_borrar_prueba(cliente_libre):
+    creada = cliente_libre.post("/api/custom", json=PRUEBA).json()
+    assert creada["id"] == "mi-zombi-de-prueba" and creada["propio"] is True
+
+    todas = cliente_libre.get("/api/examples").json()
+    assert [e["id"] for e in todas if e["propio"]] == ["mi-zombi-de-prueba"]
+    assert all(e["propio"] is False for e in todas if e["id"] != "mi-zombi-de-prueba")
+
+    assert cliente_libre.delete("/api/custom/mi-zombi-de-prueba").status_code == 200
+    assert not [e for e in cliente_libre.get("/api/examples").json() if e["propio"]]
+
+
+def test_titulos_repetidos_no_se_pisan(cliente_libre):
+    a = cliente_libre.post("/api/custom", json=PRUEBA).json()["id"]
+    b = cliente_libre.post("/api/custom", json=PRUEBA).json()["id"]
+    assert (a, b) == ("mi-zombi-de-prueba", "mi-zombi-de-prueba-2")
+
+
+def test_sobrescribir_prueba(cliente_libre):
+    id_prueba = cliente_libre.post("/api/custom", json=PRUEBA).json()["id"]
+    r = cliente_libre.put(f"/api/custom/{id_prueba}", json={**PRUEBA, "resumen": "Ahora come de todo"})
+    assert r.status_code == 200
+    propia = [e for e in cliente_libre.get("/api/examples").json() if e["propio"]][0]
+    assert propia["resumen"] == "Ahora come de todo"
+
+
+def test_prueba_de_horda_guarda_solo_states(cliente_libre):
+    horda = {**PRUEBA, "modo": "horda", "states": [{"olor": "coles"}, {"olor": "nada"}]}
+    creada = cliente_libre.post("/api/custom", json=horda).json()
+    assert "state" not in creada and len(creada["states"]) == 2
+
+
+def test_validaciones_modo_libre(cliente_libre):
+    assert cliente_libre.post("/api/custom", json={**PRUEBA, "titulo": ""}).status_code == 422
+    assert cliente_libre.post("/api/custom", json={**PRUEBA, "modo": "horda"}).status_code == 422
+    assert cliente_libre.put("/api/custom/no-existe", json=PRUEBA).status_code == 404
+    assert cliente_libre.delete("/api/custom/..%2Fapp%2Fmain").status_code in (400, 404)
+    assert cliente_libre.delete("/api/custom/Nombre_Raro").status_code == 400

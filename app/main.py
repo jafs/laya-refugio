@@ -11,6 +11,8 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from . import pruebas
+
 RAIZ = Path(__file__).resolve().parent.parent
 ESTATICOS = RAIZ / "static"
 EJEMPLOS = RAIZ / "ejemplos"
@@ -34,6 +36,7 @@ def cargar_ejemplos() -> List[Dict[str, Any]]:
         with open(fichero, encoding="utf-8") as f:
             ejemplo = json.load(f)
         ejemplo.setdefault("id", fichero.stem)
+        ejemplo["propio"] = False
         ejemplos.append(ejemplo)
     return ejemplos
 
@@ -99,7 +102,31 @@ def crear_app(cerebro=None) -> FastAPI:
 
     @app.get("/api/examples")
     def examples() -> List[Dict[str, Any]]:
-        return cargar_ejemplos()
+        """Los ejemplos fijos del repositorio y, detrás, las pruebas propias del modo libre."""
+        return cargar_ejemplos() + pruebas.listar()
+
+    @app.post("/api/custom")
+    def crear_prueba(p: pruebas.Prueba) -> Dict[str, Any]:
+        return pruebas.guardar(p)
+
+    @app.put("/api/custom/{id_prueba}")
+    def actualizar_prueba(id_prueba: str, p: pruebas.Prueba) -> Dict[str, Any]:
+        try:
+            return pruebas.guardar(p, id_prueba)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        except FileNotFoundError as exc:
+            raise HTTPException(404, f"No existe la prueba {id_prueba!r}") from exc
+
+    @app.delete("/api/custom/{id_prueba}")
+    def borrar_prueba(id_prueba: str) -> Dict[str, Any]:
+        try:
+            pruebas.borrar(id_prueba)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        except FileNotFoundError as exc:
+            raise HTTPException(404, f"No existe la prueba {id_prueba!r}") from exc
+        return {"borrada": id_prueba}
 
     @app.post("/api/predict")
     def predict(p: Peticion) -> Dict[str, Any]:

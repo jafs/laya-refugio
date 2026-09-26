@@ -35,14 +35,36 @@
     <nav class="menu caja" aria-label="Situaciones">
       <h2>SITUACIONES</h2>
       <ol id="lista-ejemplos" class="lista-ejemplos"></ol>
+      <h2 class="titulo-propias">MIS PRUEBAS</h2>
+      <ol id="lista-propias" class="lista-ejemplos propias"></ol>
+      <p id="sin-propias" class="pie-menu">Aún no has guardado ninguna.</p>
+      <button id="nueva" class="enlace nueva" type="button">+ nuevaPrueba()</button>
       <p class="pie-menu">Laya · modelo de decisión<br>sin conexión desde el arranque</p>
     </nav>
 
     <section class="trabajo">
-      <article class="caja">
-        <h2 id="titulo-ejemplo">···</h2>
+      <article id="caja-ejemplo" class="caja">
+        <div class="cabecera-caja">
+          <h2 id="titulo-ejemplo">···</h2>
+          <span id="marca-propia" class="marca-propia" hidden>prueba propia</span>
+        </div>
         <p id="resumen-ejemplo" class="resumen"></p>
         <div id="variantes" class="variantes" hidden></div>
+        <div class="gestion">
+          <button id="guardar" class="enlace" type="button" hidden>[guardar()]</button>
+          <button id="guardar-como" class="enlace" type="button">[guardarComo()]</button>
+          <button id="borrar" class="enlace peligro" type="button" hidden>[borrar()]</button>
+        </div>
+        <form id="form-guardar" class="form-guardar" hidden>
+          <label for="campo-titulo">nombre</label>
+          <input id="campo-titulo" maxlength="80" required autocomplete="off">
+          <label for="campo-resumen">descripción</label>
+          <textarea id="campo-resumen" maxlength="600" rows="2"></textarea>
+          <div class="acciones">
+            <button class="boton" type="submit">guardar()</button>
+            <button id="cancelar" class="enlace" type="button">[cancelar]</button>
+          </div>
+        </form>
       </article>
 
       <div class="columnas">
@@ -50,6 +72,7 @@
           <div class="cabecera-caja">
             <h3 id="etiqueta-estado">ESTADO</h3>
             <span class="pista">lo que se percibe · texto o JSON</span>
+            <label class="interruptor"><input type="checkbox" id="modo-horda"> horda</label>
           </div>
           <textarea id="estado" spellcheck="false" aria-labelledby="etiqueta-estado"></textarea>
         </article>

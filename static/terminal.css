@@ -10,6 +10,8 @@
   --linea-viva: #2f8f3a;
   --relleno: #0b1f0d;          /* fondo de barras y campos */
   --alerta: #e0503f;
+  --ambar: #d6a23c;              /* solo para lo propio del modo libre */
+  --ambar-tenue: #6b5220;
   --alerta-tenue: #5a1d17;
   --brillo: 0 0 3px rgba(70, 197, 83, .35);
   --mono: "IBM Plex Mono", "Cascadia Mono", "JetBrains Mono", Consolas, "DejaVu Sans Mono", monospace;
@@ -18,6 +20,9 @@
 }
 
 * { box-sizing: border-box; }
+
+/* Sin esto, cualquier elemento con display: flex o grid ignora el atributo hidden. */
+[hidden] { display: none !important; }
 
 html, body { margin: 0; min-height: 100%; background: var(--fondo); }
 
@@ -87,6 +92,33 @@ h3 { font-size: 13px; }
 .lista-ejemplos button[aria-current="true"]::before { content: "> "; }
 .lista-ejemplos .modo { display: block; font-size: 11px; color: var(--fosforo-tenue); }
 .pie-menu { margin: 0; font-size: 11px; color: var(--fosforo-tenue); }
+
+/* ---------------------------------------------------------------- modo libre (ámbar) */
+.titulo-propias { color: var(--ambar); margin-top: 6px; }
+.lista-ejemplos.propias button { color: var(--ambar); border-left: 2px dashed var(--ambar-tenue); border-radius: 0 4px 4px 0; }
+.lista-ejemplos.propias button:hover { border-color: var(--ambar-tenue); }
+.lista-ejemplos.propias button[aria-current="true"] { color: var(--ambar); border-color: var(--ambar); background: #1d160a; }
+.lista-ejemplos.propias .modo { color: var(--ambar-tenue); }
+.nueva { align-self: flex-start; color: var(--ambar); font-size: 13px; }
+.nueva:hover { color: #f0c46a; }
+.marca-propia {
+  font-size: 11px; color: var(--ambar); border: 1px dashed var(--ambar); border-radius: 3px;
+  padding: 0 6px; text-shadow: none; text-transform: uppercase; letter-spacing: .06em;
+}
+#caja-ejemplo.es-propia { border-color: var(--ambar-tenue); border-style: dashed; }
+.gestion { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 12px; }
+.enlace.peligro:hover { color: var(--alerta); }
+.form-guardar { display: grid; grid-template-columns: auto 1fr; gap: 8px 12px; align-items: start; margin-top: 12px; }
+.form-guardar label { font-size: 12px; color: var(--fosforo-tenue); padding-top: 6px; }
+.form-guardar input {
+  font: 13px var(--mono); color: var(--fosforo); background: var(--relleno);
+  border: 1px solid var(--linea); border-radius: 4px; padding: 6px 10px;
+}
+.form-guardar textarea { min-height: 0; }
+.form-guardar input:focus { outline: 1px solid var(--fosforo-vivo); outline-offset: 2px; }
+.form-guardar .acciones { grid-column: 2; }
+.interruptor { font-size: 11px; color: var(--fosforo-tenue); display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+.interruptor input { accent-color: var(--fosforo); margin: 0; }
 
 /* ---------------------------------------------------------------- cajas de trabajo */
 .cabecera-caja { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
