@@ -99,7 +99,9 @@ function pintarCabecera(s) {
   const estado = $("estado-cerebro");
   estado.classList.toggle("error", s.fase === "error");
   if (s.listo) {
-    estado.textContent = `CEREBRO: LISTO · ${s.defecto} · ${s.dispositivo} · ${s.precision}`;
+    const cerebro = s.cerebro && s.cerebro !== "original" ? s.cerebro : s.defecto;
+    const cambio = s.cambio?.en_curso ? ` · cargando ${s.cambio.hacia}...` : "";
+    estado.textContent = `CEREBRO: LISTO · ${cerebro}${s.calibracion ? " (calibrado)" : ""} · ${s.dispositivo} · ${s.precision}${cambio}`;
   } else {
     estado.textContent = `CEREBRO: ${(s.fase || "arrancando").toUpperCase()}`;
   }
@@ -529,15 +531,293 @@ async function borrarPrueba() {
   }
 }
 
+// ------------------------------------------------------------------ entrenamiento
+const NOMBRE_TRABAJO = { calibrar: "calibrar", lora: "entrenarLoRA", evaluar: "evaluar" };
+const SELLOS = {
+  en_curso: ["EN CURSO", ""], terminado: ["TERMINADO", ""], error: ["ERROR", "alerta"],
+  cancelado: ["CANCELADO", "alerta"], interrumpido: ["INTERRUMPIDO", "alerta"],
+};
+const entreno = { cerebros: [], seleccionado: null, vigilando: false };
+
+const porcentaje = (v, d = 1) => `${num(v * 100, d)} %`;
+const millones = (n) => `${num(n / 1e6, n < 1e7 ? 2 : 0)} M`;
+
+function mostrarVista(vista) {
+  const entrenando = vista === "entreno";
+  $("vista-pruebas").hidden = entrenando;
+  $("vista-entreno").hidden = !entrenando;
+  $("abrir-entreno").setAttribute("aria-current", String(entrenando));
+  if (entrenando) {
+    ui.actual = null;
+    pintarLista();
+    cargarCerebros();
+    consultarEntreno();
+  }
+}
+
+function nombreCerebro(id, calibrado) {
+  return `${id}${calibrado ? " (calibrado)" : ""}`;
+}
+
+async function cargarCerebros() {
+  let datos;
+  try {
+    datos = await api("/api/brains");
+  } catch (e) {
+    $("aviso-cerebro").textContent = e.message;
+    return;
+  }
+  entreno.cerebros = datos.cerebros;
+  if (!entreno.cerebros.some((c) => c.id === entreno.seleccionado)) {
+    entreno.seleccionado = datos.activo;
+    $("cerebro-calibrado").checked = Boolean(datos.calibracion);
+  }
+  $("cerebro-activo").textContent = `en uso: ${nombreCerebro(datos.activo, datos.calibracion)}`;
+  $("lista-cerebros").innerHTML = entreno.cerebros.map((c) => `
+    <button type="button" class="cerebro" data-c="${escapar(c.id)}" aria-pressed="${c.id === entreno.seleccionado}">
+      <span class="nombre">${c.id === datos.activo ? "● " : ""}${escapar(c.id)}</span>
+      <span class="pista">${escapar(c.descripcion)}${c.calibracion ? " · calibración disponible" : " · sin calibrar"}</span>
+    </button>`).join("");
+  for (const id of ["cal-cerebro", "eval-cerebro"]) {
+    const previo = $(id).value;
+    $(id).innerHTML = entreno.cerebros.map((c) => `<option value="${escapar(c.id)}">${escapar(c.id)}</option>`).join("");
+    if (entreno.cerebros.some((c) => c.id === previo)) $(id).value = previo;
+  }
+  pintarSeleccionCerebro();
+}
+
+function pintarSeleccionCerebro() {
+  const elegido = entreno.cerebros.find((c) => c.id === entreno.seleccionado);
+  document.querySelectorAll(".cerebro").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.c === entreno.seleccionado)));
+  $("cerebro-calibrado").disabled = !elegido?.calibracion;
+  if (!elegido?.calibracion) $("cerebro-calibrado").checked = false;
+}
+
+async function usarCerebro() {
+  const aviso = $("aviso-cerebro");
+  aviso.classList.remove("error");
+  aviso.textContent = "cambiando de cerebro...";
+  $("usar-cerebro").disabled = true;
+  try {
+    await api("/api/brain", { cerebro: entreno.seleccionado, calibrado: $("cerebro-calibrado").checked });
+    // Si cambia el modelo, se carga en segundo plano: la terminal sigue con el anterior mientras.
+    for (;;) {
+      const s = await api("/api/status");
+      pintarCabecera(s);
+      if (!s.cambio?.en_curso) {
+        if (s.cambio?.error) throw new Error(s.cambio.error);
+        aviso.textContent = `en uso: ${nombreCerebro(s.cerebro, s.calibracion)}`;
+        break;
+      }
+      await new Promise((ok) => setTimeout(ok, 700));
+    }
+  } catch (e) {
+    aviso.textContent = e.message;
+    aviso.classList.add("error");
+  } finally {
+    $("usar-cerebro").disabled = false;
+    cargarCerebros();
+  }
+}
+
+function ordenDe(tipo) {
+  if (tipo === "calibrar") return { tipo, modelo: $("cal-cerebro").value, dispositivo: $("cal-disp").value };
+  if (tipo === "evaluar") {
+    return { tipo, modelo: $("eval-cerebro").value, calibrado: $("eval-calibrado").checked, dispositivo: $("eval-disp").value };
+  }
+  const casos = $("lora-casos").value.trim();
+  return {
+    tipo, modelo: $("lora-nombre").value.trim(), epocas: Number($("lora-epocas").value),
+    rango: Number($("lora-rango").value), max_casos: casos ? Number(casos) : null,
+    barajar: $("lora-barajar").checked, dispositivo: $("lora-disp").value,
+  };
+}
+
+async function lanzarEntreno(tipo) {
+  try {
+    pintarEntreno(await api("/api/training", ordenDe(tipo)));
+    vigilarEntreno();
+  } catch (e) {
+    $("entreno-meta").textContent = e.message;
+  }
+}
+
+async function cancelarEntreno() {
+  try {
+    pintarEntreno(await api("/api/training", undefined, "DELETE"));
+  } catch (e) {
+    $("entreno-meta").textContent = e.message;
+  }
+}
+
+async function consultarEntreno() {
+  try {
+    const e = await api("/api/training");
+    pintarEntreno(e);
+    if (e.estado === "en_curso") vigilarEntreno();
+  } catch { /* el servidor aún no responde: ya lo pintará el siguiente intento */ }
+}
+
+async function vigilarEntreno() {
+  if (entreno.vigilando) return;
+  entreno.vigilando = true;
+  try {
+    for (;;) {
+      await new Promise((ok) => setTimeout(ok, 1000));
+      let e;
+      try { e = await api("/api/training"); } catch { continue; }
+      pintarEntreno(e);
+      if (e.estado !== "en_curso") break;
+    }
+  } finally {
+    entreno.vigilando = false;
+  }
+  // Una LoRA nueva o una calibración nueva aparecen como cerebros disponibles.
+  cargarCerebros();
+}
+
+// Curva de pérdida en escala logarítmica: cae en picado al principio y luego se arrastra, y en
+// escala lineal todo lo interesante quedaría aplastado contra el suelo.
+function curva(valores) {
+  const ancho = 600;
+  const alto = 90;
+  const logs = valores.map((v) => Math.log10(Math.max(v, 1e-4)));
+  const min = Math.min(...logs);
+  const max = Math.max(...logs);
+  const rango = max - min || 1;
+  const puntos = logs.map((v, i) => `${((i / (logs.length - 1)) * ancho).toFixed(1)},${(4 + (1 - (v - min) / rango) * (alto - 8)).toFixed(1)}`);
+  const guias = [0.25, 0.5, 0.75].map((f) => `<line x1="0" x2="${ancho}" y1="${alto * f}" y2="${alto * f}" class="guia"/>`).join("");
+  return `<svg class="curva" viewBox="0 0 ${ancho} ${alto}" preserveAspectRatio="none" role="img"
+    aria-label="Curva de pérdida">${guias}<polyline points="${puntos.join(" ")}"/></svg>`;
+}
+
+function barra(etiqueta, hechas, total, valor) {
+  return `<div class="fila"><span class="nombre">${escapar(etiqueta)}</span>
+    <span class="bloques">${bloques(hechas / Math.max(1, total))}</span>
+    <span class="valor">${escapar(valor ?? `${hechas} / ${total}`)}</span></div>`;
+}
+
+function tablaMetricas(m, titulo) {
+  const filas = [["TOTAL", m.total], ...Object.entries(m.por_pregunta)].map(([nombre, r]) => `
+    <tr class="${nombre === "TOTAL" ? "total" : ""}"><td>${escapar(nombre)}</td><td>${r.n}</td>
+    <td>${porcentaje(r.aciertos)}</td><td>${porcentaje(r.seguridad_media)}</td><td>${num(r.ece, 3)}</td></tr>`).join("");
+  return `<section class="respuesta"><div class="titular"><span>${escapar(titulo)}</span></div>
+    <table class="tabla"><thead><tr><th>pregunta</th><th>n</th><th>aciertos</th><th>seguridad</th><th>ECE</th></tr></thead>
+    <tbody>${filas}</tbody></table></section>`;
+}
+
+function pintarLora(e) {
+  let html = "";
+  const epocas = e.orden.epocas;
+  if (e.modelo) {
+    html += `<p class="detalle">${escapar(e.modelo.dispositivo)} · ${e.modelo.capas} capas con LoRA · `
+      + `${millones(e.modelo.entrenables)} entrenables de ${millones(e.modelo.total)} `
+      + `(${porcentaje(e.modelo.entrenables / e.modelo.total)}) · ${e.modelo.casos} situaciones</p>`;
+  }
+  if (e.lote) {
+    const l = e.lote;
+    const hechos = (l.epoca - 1) * l.lotes + l.lote;
+    const restantes = epocas * l.lotes - hechos;
+    const eta = e.estado === "en_curso" ? ` · quedan ~${Math.ceil((restantes * l.s_lote) / 60)} min` : "";
+    html += barra(`época ${l.epoca} de ${epocas}`, l.lote, l.lotes);
+    html += barra("total", hechos, epocas * l.lotes, `${Math.round((100 * hechos) / (epocas * l.lotes))} %`);
+    html += `<p class="detalle">pérdida media ${num(l.media, 4)} · ${num(l.s_lote, 2)} s por lote${eta}</p>`;
+  }
+  if (e.curva.length > 1) {
+    html += `<section class="respuesta"><div class="titular"><span>pérdida por lote</span>
+      <span class="pista">${num(e.curva[0], 3)} → ${num(e.curva[e.curva.length - 1], 3)} · escala logarítmica</span></div>
+      ${curva(e.curva)}</section>`;
+  }
+  const filas = [];
+  if (e.validacion_inicial) filas.push(["antes", null, e.validacion_inicial, null]);
+  for (const ep of e.epocas) filas.push([`época ${ep.epoca}`, ep.perdida, ep, ep.segundos]);
+  if (filas.length) {
+    html += `<table class="tabla"><thead><tr><th>validación</th><th>pérdida</th><th>aciertos</th><th>NLL</th><th>ECE</th><th>tiempo</th></tr></thead><tbody>${
+      filas.map(([n, perdida, v, s]) => `<tr><td>${n}</td><td>${perdida == null ? "—" : num(perdida, 4)}</td>
+        <td>${porcentaje(v.aciertos)}</td><td>${num(v.nll, 3)}</td><td>${num(v.ece, 3)}</td><td>${s == null ? "—" : `${s} s`}</td></tr>`).join("")
+    }</tbody></table><p class="detalle">La validación usa las mismas frases que el entrenamiento, así que un 99 % aquí no es la nota final. Para eso está evaluar().</p>`;
+  }
+  if (e.fin) {
+    html += e.fin.exportado
+      ? `<p><span class="sello">EXPORTADO en ${escapar(e.fin.exportado)} · mejor época ${e.fin.mejor_epoca}</span></p>`
+      : '<p><span class="sello alerta">NINGUNA ÉPOCA MEJORÓ: no se exporta nada</span></p>';
+    html += `<p class="detalle">${num(e.fin.minutos, 1)} min${e.fin.memoria_gpu_mb ? ` · memoria de GPU máxima ${e.fin.memoria_gpu_mb} MB` : ""}. `
+      + "Siguiente paso: calibrarlo con frases que no ha visto.</p>";
+  }
+  return html;
+}
+
+function pintarCalibrar(r) {
+  return tablaMetricas(r.antes, "prueba SIN calibrar") + tablaMetricas(r.despues, "prueba CALIBRADA")
+    + `<p class="detalle">temperaturas (choice, score, noul): ${r.temperaturas.map((t) => num(t, 2)).join(" · ")}`
+    + ` · guardado en ${escapar(r.salida)}. Los aciertos no cambian; lo que debe bajar es el ECE.</p>`;
+}
+
+function pintarEvaluar(r) {
+  const articulo = r.articulo.map((f) => `<tr><td class="${f.ok ? "" : "distinta"}">${f.ok ? "ok" : "MAL"}</td>
+    <td>${escapar(f.variante)}</td><td>${escapar(f.pregunta)}</td><td>${escapar(f.dice)}</td><td>${pct(f.seguridad)}</td>
+    <td>${f.ok ? "" : escapar(`esperado: ${f.esperado}`)}</td></tr>`).join("");
+  const aciertos = r.articulo.filter((f) => f.ok).length;
+  const o = r.orden;
+  return tablaMetricas(r.metricas, "prueba (frases que no se usan al entrenar)")
+    + `<section class="respuesta"><div class="titular"><span>ejemplos del artículo</span><span class="pista">${aciertos} de ${r.articulo.length}</span></div>
+      <table class="tabla"><tbody>${articulo}</tbody></table></section>`
+    + `<p><span class="sello ${o.proporcion > 0.2 ? "alerta" : ""}">SESGO DE ORDEN: cambia en ${o.cambian} de ${o.preguntas} (${porcentaje(o.proporcion)}) al invertir las opciones</span></p>`;
+}
+
+function pintarEntreno(e) {
+  const enCurso = e.estado === "en_curso";
+  for (const id of ["lanzar-calibrar", "lanzar-lora", "lanzar-evaluar"]) $(id).disabled = enCurso;
+  $("cancelar-entreno").hidden = !enCurso;
+  if (e.estado === "nada") return;
+
+  const o = e.orden;
+  const args = o.tipo === "evaluar" ? `${o.modelo}${o.calibrado ? ", calibrado" : ""}` : o.modelo;
+  $("entreno-titulo").textContent = `PROGRESO · ${NOMBRE_TRABAJO[o.tipo]}(${args})`;
+  const segundos = e.lanzado ? Math.max(0, Math.round(Date.now() / 1000 - e.lanzado)) : null;
+  $("entreno-meta").textContent = enCurso && segundos != null ? `${Math.floor(segundos / 60)} min ${segundos % 60} s` : e.id;
+
+  const [texto, clase] = SELLOS[e.estado] || [e.estado.toUpperCase(), ""];
+  let html = `<p><span class="sello ${clase}">${texto}</span>`;
+  if (enCurso && e.fase) html += ` <span class="spinner" aria-hidden="true"></span> ${escapar(e.fase)}`;
+  html += "</p>";
+  if (enCurso && e.avance) html += barra(e.avance.etapa, e.avance.hechas, e.avance.total);
+  if (o.tipo === "lora") html += pintarLora(e);
+  if (e.resultado && o.tipo === "calibrar") html += pintarCalibrar(e.resultado);
+  if (e.resultado && o.tipo === "evaluar") html += pintarEvaluar(e.resultado);
+  if (e.registro) {
+    html += `<details class="registro" ${e.estado === "error" ? "open" : ""}><summary>registro</summary><pre>${escapar(e.registro)}</pre></details>`;
+  }
+  $("entreno").innerHTML = html;
+}
+
 // ------------------------------------------------------------------ arranque de la página
 for (const lista of ["lista-ejemplos", "lista-propias"]) {
   $(lista).addEventListener("click", (ev) => {
     const boton = ev.target.closest("button[data-i]");
-    if (boton) seleccionar(ui.ejemplos[Number(boton.dataset.i)]);
+    if (boton) {
+      mostrarVista("pruebas");
+      seleccionar(ui.ejemplos[Number(boton.dataset.i)]);
+    }
   });
 }
 
-$("nueva").addEventListener("click", nuevaPrueba);
+$("nueva").addEventListener("click", () => {
+  mostrarVista("pruebas");
+  nuevaPrueba();
+});
+$("abrir-entreno").addEventListener("click", () => mostrarVista("entreno"));
+$("lista-cerebros").addEventListener("click", (ev) => {
+  const boton = ev.target.closest("button[data-c]");
+  if (!boton) return;
+  entreno.seleccionado = boton.dataset.c;
+  pintarSeleccionCerebro();
+});
+$("usar-cerebro").addEventListener("click", usarCerebro);
+$("lanzar-calibrar").addEventListener("click", () => lanzarEntreno("calibrar"));
+$("lanzar-lora").addEventListener("click", () => lanzarEntreno("lora"));
+$("lanzar-evaluar").addEventListener("click", () => lanzarEntreno("evaluar"));
+$("cancelar-entreno").addEventListener("click", cancelarEntreno);
 $("guardar-como").addEventListener("click", abrirFormulario);
 $("cancelar").addEventListener("click", cerrarFormulario);
 $("borrar").addEventListener("click", borrarPrueba);
@@ -576,6 +856,7 @@ document.addEventListener("keydown", (ev) => {
 
 (async () => {
   vigilarCerebro();
+  consultarEntreno();
   try {
     ui.ejemplos = await api("/api/examples");
     if (ui.ejemplos.length) seleccionar(ui.ejemplos[0]);

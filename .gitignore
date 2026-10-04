@@ -5,3 +5,5 @@ __pycache__/
 server.log
 .env
 mis-pruebas/
+modelos/
+entrenos/

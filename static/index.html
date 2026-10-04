@@ -39,10 +39,12 @@
       <ol id="lista-propias" class="lista-ejemplos propias"></ol>
       <p id="sin-propias" class="pie-menu">Aún no has guardado ninguna.</p>
       <button id="nueva" class="enlace nueva" type="button">+ nuevaPrueba()</button>
+      <h2 class="titulo-entreno">ENTRENAMIENTO</h2>
+      <button id="abrir-entreno" class="enlace entrenar" type="button" aria-current="false">&gt; entrenar()</button>
       <p class="pie-menu">Laya · modelo de decisión<br>sin conexión desde el arranque</p>
     </nav>
 
-    <section class="trabajo">
+    <section id="vista-pruebas" class="trabajo">
       <article id="caja-ejemplo" class="caja">
         <div class="cabecera-caja">
           <h2 id="titulo-ejemplo">···</h2>
@@ -101,6 +103,60 @@
         <div id="resultados" class="resultados">
           <p class="vacio">&gt; esperando órdenes_</p>
         </div>
+      </article>
+    </section>
+
+    <!-- Entrenamiento: elegir cerebro, lanzar calibración, LoRA o evaluación y seguir el progreso. -->
+    <section id="vista-entreno" class="trabajo" hidden>
+      <article class="caja">
+        <div class="cabecera-caja">
+          <h2>CEREBRO ACTIVO</h2>
+          <span id="cerebro-activo" class="pista"></span>
+        </div>
+        <div id="lista-cerebros" class="cerebros"></div>
+        <div class="acciones">
+          <label class="interruptor"><input type="checkbox" id="cerebro-calibrado"> calibrado</label>
+          <button id="usar-cerebro" class="boton" type="button">usarCerebro()</button>
+          <span id="aviso-cerebro" class="aviso" role="status"></span>
+        </div>
+      </article>
+
+      <div class="columnas tres">
+        <article class="caja lanzador">
+          <h3>CALIBRAR</h3>
+          <p class="pista">Ajusta las temperaturas. No cambia ninguna respuesta, solo lo seguro que dice estar.</p>
+          <label>cerebro <select id="cal-cerebro"></select></label>
+          <label>dispositivo <select id="cal-disp"><option>auto</option><option>cpu</option><option>cuda</option></select></label>
+          <button id="lanzar-calibrar" class="boton" type="button">calibrar()</button>
+        </article>
+        <article class="caja lanzador">
+          <h3>LORA</h3>
+          <p class="pista">Entrena unas matrices pequeñas al lado del modelo congelado.</p>
+          <label>nombre <input id="lora-nombre" value="lora-refugio" maxlength="40" autocomplete="off" spellcheck="false"></label>
+          <label>épocas <input id="lora-epocas" type="number" min="1" max="10" value="3"></label>
+          <label>rango <select id="lora-rango"><option>4</option><option selected>8</option><option>16</option><option>32</option></select></label>
+          <label>casos <input id="lora-casos" type="number" min="10" placeholder="todos"></label>
+          <label class="interruptor"><input type="checkbox" id="lora-barajar" checked> barajar opciones</label>
+          <label>dispositivo <select id="lora-disp"><option>auto</option><option>cpu</option><option>cuda</option></select></label>
+          <button id="lanzar-lora" class="boton" type="button">entrenarLoRA()</button>
+        </article>
+        <article class="caja lanzador">
+          <h3>EVALUAR</h3>
+          <p class="pista">Aciertos, ECE, ejemplos del artículo y sesgo de orden, con frases no vistas.</p>
+          <label>cerebro <select id="eval-cerebro"></select></label>
+          <label class="interruptor"><input type="checkbox" id="eval-calibrado" checked> calibrado</label>
+          <label>dispositivo <select id="eval-disp"><option>auto</option><option>cpu</option><option>cuda</option></select></label>
+          <button id="lanzar-evaluar" class="boton" type="button">evaluar()</button>
+        </article>
+      </div>
+
+      <article class="caja salida">
+        <div class="cabecera-caja">
+          <h3 id="entreno-titulo">PROGRESO</h3>
+          <span id="entreno-meta" class="pista"></span>
+          <button id="cancelar-entreno" class="enlace peligro" type="button" hidden>[cancelar()]</button>
+        </div>
+        <div id="entreno" class="resultados"><p class="vacio">&gt; ningún entrenamiento todavía_</p></div>
       </article>
     </section>
   </main>

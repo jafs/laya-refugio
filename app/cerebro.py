@@ -62,7 +62,8 @@ class Cerebro:
     """Carga los checkpoints pedidos y los sirve a través del `Router` de Laya."""
 
     def __init__(self, checkpoints: List[str], defecto: str = "multilingual",
-                 dispositivo: str = "auto", precision: str = "auto"):
+                 dispositivo: str = "auto", precision: str = "auto",
+                 modelos_locales: Optional[Dict[str, str]] = None, calibracion: Optional[str] = None):
         desconocidos = [c for c in checkpoints if c not in CHECKPOINTS]
         if desconocidos:
             raise ValueError(f"Checkpoints desconocidos: {desconocidos}. Opciones: {sorted(CHECKPOINTS)}")
@@ -74,7 +75,21 @@ class Cerebro:
         if precision not in ("auto", "fp16", "fp32"):
             raise ValueError(f"Precisión desconocida: {precision}. Opciones: auto, fp16, fp32")
         self.precision_pedida = precision
+        # Carpetas con checkpoints propios (los que exporta entrenamiento/lora.py) que sustituyen
+        # a los de Hugging Face, y temperaturas de entrenamiento/calibrar.py.
+        self.modelos_locales = {n: r for n, r in (modelos_locales or {}).items() if n in checkpoints}
+        for nombre, ruta in self.modelos_locales.items():
+            if not (Path(ruta) / "rl_agent_config.json").is_file():
+                raise ValueError(f"LAYA_MODELO_{nombre.upper()}={ruta} no es un checkpoint de Laya "
+                                 "(falta rl_agent_config.json)")
+        self.calibracion_ruta = calibracion
+        self.calibracion = _leer_calibracion(calibracion) if calibracion else None
+        if self.calibracion and self.calibracion["checkpoint"] not in checkpoints:
+            raise ValueError(f"La calibración {calibracion} es para {self.calibracion['checkpoint']}, "
+                             f"que no está en {checkpoints}")
         self.router = None
+        self._rutas: Dict[str, str] = {}
+        self._cambio: Dict[str, Any] = {"en_curso": False, "error": None}
         self.dispositivo: Optional[str] = None
         self.precision: Optional[str] = None
         self._estado: Dict[str, Any] = {
@@ -94,9 +109,11 @@ class Cerebro:
     def _cargar(self) -> None:
         t0 = time.time()
         try:
-            rutas = {nombre: self._localizar(nombre) for nombre in self.checkpoints}
+            rutas = {nombre: self.modelos_locales.get(nombre) or self._localizar(nombre)
+                     for nombre in self.checkpoints}
             self._estado.update(fase="cargando", checkpoint=None)
-            self._construir_router(rutas)
+            self._rutas = {n: r for n, r in rutas.items() if n not in self.modelos_locales}
+            self._instalar(self._crear_router(rutas, self.modelos_locales, self.calibracion))
             self._estado.update(fase="listo", segundos_carga=round(time.time() - t0, 1))
         except Exception as exc:  # noqa: BLE001 - se enseña tal cual en la terminal
             self._estado.update(fase="error", error=f"{type(exc).__name__}: {exc}")
@@ -135,7 +152,9 @@ class Cerebro:
             actual = _tamano_dir(carpeta) if carpeta.exists() else 0
             self._estado["descargado_mb"] = max(0, round((actual - inicial) / 1_048_576))
 
-    def _construir_router(self, rutas: Dict[str, str]) -> None:
+    def _crear_router(self, rutas: Dict[str, str], locales: Dict[str, str],
+                      calibracion: Optional[Dict[str, Any]]):
+        """Un Router con los checkpoints cargados, calibrados y calentados (no lo instala)."""
         import torch
         from laya import Router
 
@@ -145,20 +164,81 @@ class Cerebro:
                 f"Se pidió LAYA_DEVICE={dispositivo}, pero esta instalación de torch "
                 f"({torch.__version__}) no ve ninguna GPU CUDA."
             )
-        modelos = {nombre: (ruta, CHECKPOINTS[nombre]) for nombre, ruta in rutas.items()}
+        modelos = {nombre: (locales[nombre], None) if nombre in locales else (ruta, CHECKPOINTS[nombre])
+                   for nombre, ruta in rutas.items()}
         router = Router(models=modelos, device=dispositivo, default=self.defecto,
                         max_loaded=len(modelos))
         router.preload(list(modelos))   # solo los nuestros; el Router conoce también typed-decisions
         for nombre in modelos:
             agente = router.load(nombre)
             self._ajustar_precision(agente)
+            if calibracion and calibracion["checkpoint"] == nombre:
+                _aplicar_calibracion(agente, calibracion)
             # La primera inferencia paga la inicialización de CUDA/kernels; mejor aquí que en la
             # primera petición de la terminal.
             agente.predict("calentando motores", {"ok": {"type": "noul", "instructions": "¿Listo?"}})
+        return router
+
+    def _instalar(self, router) -> None:
         agente = router.load(self.defecto)
         self.dispositivo = str(agente.device)
         self.precision = "fp32" if not agente.amp_enabled else str(agente.dtype).replace("torch.float", "fp")
         self.router = router
+
+    # ------------------------------------------------------------------ cambio de cerebro
+    def cambiar(self, modelo: Optional[str], calibracion: Optional[str]) -> None:
+        """Pasa el checkpoint por defecto a otro cerebro (`modelo`: carpeta local o None para el
+        original) con o sin calibración, sin reiniciar el servidor.
+
+        Si solo cambia la calibración, se aplica al momento. Si cambia el modelo, el nuevo se carga
+        en segundo plano y la terminal sigue respondiendo con el anterior hasta que está listo.
+        """
+        if not self.listo:
+            raise RuntimeError("El cerebro todavía no ha terminado de arrancar")
+        if self._cambio["en_curso"]:
+            raise RuntimeError("Ya se está cambiando de cerebro")
+        if modelo and not (Path(modelo) / "rl_agent_config.json").is_file():
+            raise ValueError(f"{modelo} no es un checkpoint de Laya (falta rl_agent_config.json)")
+        datos = _leer_calibracion(calibracion) if calibracion else None
+        if datos and datos["checkpoint"] != self.defecto:
+            raise ValueError(f"La calibración {calibracion} es para {datos['checkpoint']}, no para {self.defecto}")
+
+        locales = {n: r for n, r in self.modelos_locales.items() if n != self.defecto}
+        if modelo:
+            locales[self.defecto] = modelo
+        if locales == self.modelos_locales:
+            agente = self.router.load(self.defecto)
+            if datos:
+                _aplicar_calibracion(agente, datos)
+            else:
+                _quitar_calibracion(agente)
+            self.calibracion, self.calibracion_ruta = datos, calibracion
+            self._cambio = {"en_curso": False, "error": None}
+            return
+
+        self._cambio = {"en_curso": True, "error": None, "hacia": Path(modelo).name if modelo else "original"}
+
+        def cargar():
+            try:
+                rutas = {n: self._rutas.get(n) or self._localizar_sin_estado(n) for n in self.checkpoints}
+                nuevo = self._crear_router(rutas, locales, datos)
+                viejo = self.router
+                self._instalar(nuevo)
+                self.modelos_locales, self.calibracion, self.calibracion_ruta = locales, datos, calibracion
+                self._cambio = {"en_curso": False, "error": None}
+                _liberar(viejo)
+            except Exception as exc:  # noqa: BLE001 - se enseña en la terminal; sigue el anterior
+                self._cambio = {"en_curso": False, "error": f"{type(exc).__name__}: {exc}"}
+
+        threading.Thread(target=cargar, daemon=True, name="cambio-cerebro").start()
+
+    def _localizar_sin_estado(self, nombre: str) -> str:
+        """Como _localizar, pero sin tocar la fase de arranque (el cerebro ya está listo)."""
+        from huggingface_hub import snapshot_download
+
+        ruta = snapshot_download(REPO, revision=REVISION, allow_patterns=_patrones(nombre))
+        self._rutas[nombre] = ruta
+        return ruta
 
     def _ajustar_precision(self, agente) -> None:
         """Laya usa fp16 en cualquier GPU CUDA, pero en las GTX 16xx (sin tensor cores) el fp16
@@ -188,6 +268,12 @@ class Cerebro:
             "defecto": self.defecto,
             "dispositivo": self.dispositivo,
             "precision": self.precision,
+            "modelos_locales": self.modelos_locales,
+            "calibracion": self.calibracion_ruta,
+            "cambio": self._cambio,
+            # El cerebro que responde ahora: «original» o el nombre de la carpeta de modelos/.
+            "cerebro": Path(self.modelos_locales[self.defecto]).name if self.defecto in self.modelos_locales
+            else "original",
             "listo": self.listo,
         }
 
@@ -244,6 +330,58 @@ class Cerebro:
         """
         return barajar(lambda e, q: self.predecir(e, q, modelo), estado, preguntas,
                        id_pregunta, rondas, semilla)
+
+
+def _leer_calibracion(ruta: str) -> Dict[str, Any]:
+    import json
+
+    with open(ruta, encoding="utf-8") as f:
+        datos = json.load(f)
+    temperaturas = datos.get("temperature")
+    if not isinstance(temperaturas, list) or len(temperaturas) != 3:
+        raise ValueError(f"{ruta}: 'temperature' tiene que ser una lista de 3 números (choice, score, noul)")
+    datos.setdefault("checkpoint", "multilingual")
+    datos.setdefault("temperature_by_options", {})
+    return datos
+
+
+def _aplicar_calibracion(agente, calibracion: Dict[str, Any]) -> None:
+    """Sustituye las temperaturas del checkpoint por las ajustadas con entrenamiento/calibrar.py.
+
+    Laya divide los logits por la temperatura antes del softmax: no cambia la respuesta elegida,
+    solo lo segura que dice estar. Se recortan a los mismos límites que aplica Laya al cargar.
+    """
+    from laya.common import clamp_temperature
+
+    agente.temperature = [clamp_temperature(t) for t in calibracion["temperature"]]
+    agente.temperature_by_options = {k: clamp_temperature(v)
+                                     for k, v in calibracion["temperature_by_options"].items()}
+
+
+def _quitar_calibracion(agente) -> None:
+    """Vuelve a las temperaturas con las que venía el checkpoint."""
+    from laya.common import clamp_temperature
+
+    agente.temperature = [clamp_temperature(t) for t in agente.temperature_raw]
+    agente.temperature_by_options = {k: clamp_temperature(v) for k, v in agente.temperature_by_options_raw.items()}
+
+
+def _liberar(router) -> None:
+    """Descarga los modelos de un Router que ya no se usa y devuelve la memoria de la GPU."""
+    try:
+        router.unload()
+    except Exception:  # noqa: BLE001 - liberar es un extra, no puede romper el cambio
+        pass
+    try:
+        import gc
+
+        import torch
+
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def ordenes_barajados(claves: List[str], rondas: int, azar: random.Random) -> List[List[str]]:

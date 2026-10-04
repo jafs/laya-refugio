@@ -67,6 +67,8 @@ Siempre puedes personalizar todo aún más, si escribes un .env con alguna de es
 | `LAYA_PRECISION` | `auto` | `auto`, `fp16` o `fp32`. Laya usa fp16 en GPU, pero en las tarjetas que no tienen tensor cores el fp16 va varias veces más lento que el fp32; en modo `auto` se detectan y se usa fp32. |
 | `PORT` | `8000` | Puerto HTTP. |
 | `LAYA_MIS_PRUEBAS` | `mis-pruebas` | Carpeta donde se guardan las pruebas del modo libre. |
+| `LAYA_CALIBRACION` | — | JSON de temperaturas de `entrenamiento/calibrar.py`. Ver [entrenamiento/README.md](entrenamiento/README.md). |
+| `LAYA_MODELO_MULTILINGUAL` | — | Carpeta con un checkpoint propio (el de `entrenamiento/lora.py`) en lugar del de Hugging Face. También `LAYA_MODELO_ENGLISH`. |
 
 ## API
 
@@ -79,6 +81,11 @@ Siempre puedes personalizar todo aún más, si escribes un .env con alguna de es
 | `DELETE` | `/api/custom/{id}` | Borra una prueba propia. |
 | `POST` | `/api/predict` | `{"state": ..., "questions": {...}}` → respuesta de Laya, checkpoint elegido y `latency_ms`. |
 | `POST` | `/api/horde` | `{"states": [...], "questions": {...}}` → las mismas preguntas para muchos estados en lotes, con el tiempo comparado contra hacerlo uno a uno. |
+| `GET` | `/api/brains` | Cerebros disponibles (el original y los de `modelos/`) y cuál responde ahora. |
+| `POST` | `/api/brain` | `{"cerebro": "lora-refugio", "calibrado": true}` → cambia de cerebro sin reiniciar. |
+| `GET` | `/api/training` | Estado del último entrenamiento: fase, lotes, curva de pérdida, épocas, resultado y registro. |
+| `POST` | `/api/training` | Lanza `calibrar`, `lora` o `evaluar` en un proceso aparte. |
+| `DELETE` | `/api/training` | Cancela el entrenamiento en marcha. |
 | `POST` | `/api/permute` | `{"state": ..., "questions": {...}, "question_id": "accion"}` → repite una pregunta `choice` con las opciones en distinto orden para ver si cambia la respuesta. Spoiler: a veces sí. |
 
 Formato de las preguntas:
@@ -101,6 +108,8 @@ app/main.py      FastAPI: endpoints y ficheros estáticos
 app/pruebas.py   pruebas propias del modo libre (mis-pruebas/*.json)
 ejemplos/        situaciones del refugio en JSON
 static/          la terminal (HTML + JS, sin compilación)
+app/entrenos.py  entrenamientos lanzados desde la web, en procesos aparte
+entrenamiento/   calibración y LoRA (ver entrenamiento/README.md)
 tests/           tests de la API con un cerebro falso (no cargan el modelo)
 ```
 

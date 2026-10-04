@@ -220,3 +220,41 @@ textarea:focus, button:focus-visible { outline: 1px solid var(--fosforo-vivo); o
   .spinner { animation: none; }
   .arranque, .barra i { transition: none; }
 }
+
+/* ---------------------------------------------------------------- entrenamiento */
+.titulo-entreno { margin-top: 6px; }
+.entrenar { align-self: flex-start; font-size: 13px; color: var(--fosforo); }
+.entrenar[aria-current="true"] { color: var(--fosforo-vivo); }
+.columnas.tres { grid-template-columns: repeat(3, 1fr); }
+@media (max-width: 1200px) { .columnas.tres { grid-template-columns: 1fr; } }
+.cerebros { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+.cerebro {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left;
+  font: inherit; color: var(--fosforo); text-shadow: inherit; cursor: pointer;
+  background: none; border: 1px solid var(--linea); border-radius: 4px; padding: 6px 10px;
+}
+.cerebro:hover { border-color: var(--linea-viva); }
+.cerebro[aria-pressed="true"] { border-color: var(--fosforo-vivo); background: var(--relleno); }
+.cerebro[aria-pressed="true"] .nombre { color: var(--fosforo-vivo); }
+.lanzador { display: flex; flex-direction: column; gap: 8px; }
+.lanzador .pista { margin: 0; }
+.lanzador label:not(.interruptor) {
+  display: grid; grid-template-columns: 90px 1fr; align-items: center; gap: 8px; font-size: 12px; color: var(--fosforo-tenue);
+}
+.lanzador input:not([type="checkbox"]), .lanzador select {
+  font: 13px var(--mono); color: var(--fosforo); background: var(--relleno); min-width: 0;
+  border: 1px solid var(--linea); border-radius: 4px; padding: 5px 8px;
+}
+.lanzador input:focus, .lanzador select:focus { outline: 1px solid var(--fosforo-vivo); outline-offset: 2px; }
+.lanzador .boton { align-self: flex-start; margin-top: 4px; }
+.curva { display: block; width: 100%; height: 90px; margin-top: 4px; }
+.curva polyline { fill: none; stroke: var(--fosforo-vivo); stroke-width: 1.5; vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 0 2px rgba(124, 240, 135, .5)); }
+.curva .guia { stroke: var(--linea); stroke-width: 1; stroke-dasharray: 2 4; vector-effect: non-scaling-stroke; }
+.tabla tr.total td { color: var(--fosforo-vivo); }
+.registro summary { cursor: pointer; font-size: 12px; color: var(--fosforo-tenue); }
+.registro pre {
+  margin: 6px 0 0; padding: 10px; max-height: 260px; overflow: auto; font: 12px/1.4 var(--mono);
+  color: var(--fosforo-tenue); background: var(--relleno); border: 1px solid var(--linea); border-radius: 4px;
+}
+#vista-entreno .spinner { display: inline-block; vertical-align: middle; }

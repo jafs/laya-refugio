@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import pruebas
+from .entrenos import ORIGINAL, Entrenos, Orden, buscar_cerebro, cerebros_disponibles
 
 RAIZ = Path(__file__).resolve().parent.parent
 ESTATICOS = RAIZ / "static"
@@ -22,7 +23,15 @@ def cerebro_desde_entorno():
     from .cerebro import Cerebro
 
     checkpoints = [c.strip() for c in os.environ.get("LAYA_CHECKPOINTS", "multilingual").split(",") if c.strip()]
+    locales = {}
+    for nombre in ("multilingual", "english"):
+        ruta = os.environ.get(f"LAYA_MODELO_{nombre.upper()}", "").strip()
+        if ruta:
+            locales[nombre] = str(RAIZ / ruta)   # relativa a la raíz del repo (o absoluta)
+    calibracion = os.environ.get("LAYA_CALIBRACION", "").strip()
     return Cerebro(
+        modelos_locales=locales,
+        calibracion=str(RAIZ / calibracion) if calibracion else None,
         checkpoints=checkpoints,
         defecto=os.environ.get("LAYA_DEFAULT", checkpoints[0]),
         dispositivo=os.environ.get("LAYA_DEVICE", "auto").strip() or "auto",
@@ -54,14 +63,20 @@ class PeticionHorda(BaseModel):
     comparar: bool = True
 
 
+class PeticionCerebro(BaseModel):
+    cerebro: str = ORIGINAL
+    calibrado: bool = False
+
+
 class PeticionBarajar(Peticion):
     question_id: str
     rondas: int = Field(default=6, ge=2, le=24)
     semilla: Optional[int] = None
 
 
-def crear_app(cerebro=None) -> FastAPI:
-    """`cerebro` se inyecta en los tests; si no se pasa, se crea a partir de las variables de entorno."""
+def crear_app(cerebro=None, entrenos: Optional[Entrenos] = None) -> FastAPI:
+    """`cerebro` y `entrenos` se inyectan en los tests; si no se pasa el cerebro, se crea a partir de
+    las variables de entorno."""
 
     @asynccontextmanager
     async def ciclo_de_vida(app: FastAPI):
@@ -70,6 +85,8 @@ def crear_app(cerebro=None) -> FastAPI:
             app.state.cerebro = cerebro_desde_entorno()
             app.state.cerebro.arrancar()
         yield
+        # Un entrenamiento a medias no debe quedarse huérfano ocupando la GPU.
+        app.state.entrenos.cancelar()
         if modelo_real:
             # Red de seguridad: si algo nativo (torch, CUDA, los hilos de descarga) impide que el
             # intérprete termine, el proceso se cierra igualmente y suelta la VRAM.
@@ -79,6 +96,7 @@ def crear_app(cerebro=None) -> FastAPI:
 
     app = FastAPI(title="Terminal del refugio", lifespan=ciclo_de_vida)
     app.state.cerebro = cerebro
+    app.state.entrenos = entrenos or Entrenos(RAIZ)
 
     def cerebro_listo():
         c = app.state.cerebro
@@ -144,6 +162,48 @@ def crear_app(cerebro=None) -> FastAPI:
     def permute(p: PeticionBarajar) -> Dict[str, Any]:
         return ejecutar(cerebro_listo().barajar, p.state, p.questions, p.question_id,
                         p.rondas, p.model, p.semilla)
+
+    # ------------------------------------------------------------------ entrenamiento
+    @app.get("/api/brains")
+    def brains() -> Dict[str, Any]:
+        """Los cerebros que se pueden usar: el original y los que haya en modelos/."""
+        c = app.state.cerebro
+        estado = c.estado() if c else {}
+        return {"cerebros": cerebros_disponibles(app.state.entrenos.raiz), "activo": estado.get("cerebro", ORIGINAL),
+                "calibracion": estado.get("calibracion"), "cambio": estado.get("cambio")}
+
+    @app.post("/api/brain")
+    def brain(p: PeticionCerebro) -> Dict[str, Any]:
+        c = cerebro_listo()
+        try:
+            raiz = app.state.entrenos.raiz
+            elegido = buscar_cerebro(p.cerebro, raiz)
+            if p.calibrado and not elegido["calibracion"]:
+                raise ValueError(f"{p.cerebro} no tiene calibración todavía")
+            c.cambiar(str(raiz / elegido["modelo"]) if elegido["modelo"] else None,
+                      str(raiz / elegido["calibracion"]) if p.calibrado else None)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        except RuntimeError as exc:
+            raise HTTPException(409, str(exc)) from exc
+        return c.estado()
+
+    @app.get("/api/training")
+    def training() -> Dict[str, Any]:
+        return app.state.entrenos.estado()
+
+    @app.post("/api/training")
+    def lanzar_entreno(orden: Orden) -> Dict[str, Any]:
+        try:
+            return app.state.entrenos.lanzar(orden)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        except RuntimeError as exc:
+            raise HTTPException(409, str(exc)) from exc
+
+    @app.delete("/api/training")
+    def cancelar_entreno() -> Dict[str, Any]:
+        return app.state.entrenos.cancelar()
 
     @app.get("/")
     def index() -> FileResponse:
