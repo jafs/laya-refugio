@@ -702,8 +702,9 @@ function tablaMetricas(m, titulo) {
     <tr class="${nombre === "TOTAL" ? "total" : ""}"><td>${escapar(nombre)}</td><td>${r.n}</td>
     <td>${porcentaje(r.aciertos)}</td><td>${porcentaje(r.seguridad_media)}</td><td>${num(r.ece, 3)}</td></tr>`).join("");
   return `<section class="respuesta"><div class="titular"><span>${escapar(titulo)}</span></div>
-    <table class="tabla"><thead><tr><th>pregunta</th><th>n</th><th>aciertos</th><th>seguridad</th><th>ECE</th></tr></thead>
-    <tbody>${filas}</tbody></table></section>`;
+    <table class="tabla"><thead><tr><th>pregunta</th><th>n</th><th>aciertos</th><th>seguridad</th><th title="Error de calibración esperado: distancia entre lo seguro que dice estar y lo que acierta de verdad. 0 es perfecto.">ECE</th></tr></thead>
+    <tbody>${filas}</tbody></table>
+    <p class="detalle">ECE: distancia entre lo seguro que dice estar y lo que acierta (0 es perfecto).</p></section>`;
 }
 
 function pintarLora(e) {
@@ -732,10 +733,10 @@ function pintarLora(e) {
   if (e.validacion_inicial) filas.push(["antes", null, e.validacion_inicial, null]);
   for (const ep of e.epocas) filas.push([`época ${ep.epoca}`, ep.perdida, ep, ep.segundos]);
   if (filas.length) {
-    html += `<table class="tabla"><thead><tr><th>validación</th><th>pérdida</th><th>aciertos</th><th>NLL</th><th>ECE</th><th>tiempo</th></tr></thead><tbody>${
+    html += `<table class="tabla"><thead><tr><th>validación</th><th>pérdida</th><th>aciertos</th><th title="Pérdida logarítmica: castiga dar la respuesta correcta con poca seguridad y, sobre todo, fallar muy seguro. Cuanto más baja, mejor.">NLL</th><th title="Error de calibración esperado: distancia entre lo seguro que dice estar y lo que acierta de verdad. 0 es perfecto.">ECE</th><th>tiempo</th></tr></thead><tbody>${
       filas.map(([n, perdida, v, s]) => `<tr><td>${n}</td><td>${perdida == null ? "—" : num(perdida, 4)}</td>
         <td>${porcentaje(v.aciertos)}</td><td>${num(v.nll, 3)}</td><td>${num(v.ece, 3)}</td><td>${s == null ? "—" : `${s} s`}</td></tr>`).join("")
-    }</tbody></table><p class="detalle">La validación usa las mismas frases que el entrenamiento, así que un 99 % aquí no es la nota final. Para eso está evaluar().</p>`;
+    }</tbody></table><p class="detalle">NLL: pérdida logarítmica, castiga sobre todo fallar muy seguro (más baja, mejor). ECE: distancia entre lo seguro que dice estar y lo que acierta (0 es perfecto).</p><p class="detalle">La validación usa las mismas frases que el entrenamiento, así que un 99 % aquí no es la nota final. Para eso está evaluar().</p>`;
   }
   if (e.fin) {
     html += e.fin.exportado

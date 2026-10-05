@@ -233,6 +233,8 @@ def metricas(registros: Sequence[Registro], calibracion: Optional[Dict[str, Any]
 
     ECE (error de calibración esperado): se agrupan las respuestas por la seguridad declarada
     (max p) y se compara con la proporción de aciertos de cada grupo. 0 es perfecto.
+    NLL (pérdida logarítmica): media de -log(probabilidad que dio a la respuesta correcta).
+    Castiga sobre todo fallar muy seguro. Cuanto más baja, mejor.
     """
     from laya.common import ece_score
 
